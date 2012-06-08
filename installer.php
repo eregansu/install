@@ -582,7 +582,7 @@ class Installer
 				echo "--> " . $path . "login does not exist, creating\n";			
 				symlink($rpath, $path . 'login');
 			}
-			if(!file_exists($path . 'default'))
+			if(!file_exists($path . 'default') && file_exists(PLATFORM_ROOT . 'examples/templates/'))
 			{
 				echo "--> " . $path . "default does not exist, creating\n";
 				mkdir($path . 'default');
