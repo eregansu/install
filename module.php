@@ -21,10 +21,12 @@ abstract class ModuleInstaller
 	public $name;
 	public $path;
 	public $moduleOrder = 1000;
+	public $ui;
 	
 	public function __construct($installer, $name, $path)
 	{
 		$this->installer = $installer;
+		$this->ui = $installer->ui;
 		if(!strlen($this->name))
 		{
 			$this->name = $name;
@@ -36,7 +38,7 @@ abstract class ModuleInstaller
 	{
 		if(0 == strlen($constant))
 		{
-			$constant = strtoupper($this->name . '_IRI');
+			$constant = strtoupper($this->name . '_DB');
 		}
 		if(0 == strlen($dbname))
 		{
@@ -75,6 +77,24 @@ abstract class ModuleInstaller
 		}
 	}
 	
+	protected function writeModuleSchema($file, $class = null, $filename = null)
+	{
+		if(!strlen($class) && !strlen($filename))
+		{
+			fwrite($file, "\$SETUP_MODULES[] = '" . $this->name . "';\n");
+			return;
+		}
+		if(!strlen($class))
+		{
+			$class = $this->name . 'Schema';
+		}
+		if(!strlen($filename))
+		{
+			$filename = 'schema.php';
+		}
+		fwrite($file, "\$SETUP_MODULES[] = array('name' => '" . $this->name . "', 'class' => '" . $class . "', 'filename' => '" . $filename . "');\n");
+	}
+	
 	public function writeAppConfig($file, $isSoleWebModule = false, $chosenSoleWebModule = null)
 	{
 	}
@@ -98,35 +118,57 @@ abstract class ModuleInstaller
 		$this->linkTemplates();
 	}
 	
-	protected function linkTemplates($subdir = 'templates', $target = null)
+	protected function linkTemplates($subdir = 'templates', $target = null, $rpath = null)
 	{
 		if(!strlen($target))
 		{
 			$target = $this->name;
 		}
-		if(substr($this->installer->relModulesPath, 0, 1) == '/')
+		if(!strlen($rpath))
 		{
-			$rpath = $this->installer->relModulesPath;
-		}
-		else
-		{
-			$rpath = '../../' . $this->installer->relModulesPath;
+			if(substr($this->installer->relModulesPath, 0, 1) == '/')
+			{
+				$rpath = $this->installer->relModulesPath;
+			}
+			else
+			{
+				$rpath = '../../' . $this->installer->relModulesPath;
+			}
 		}
 		if(substr($rpath, -1) != '/') $rpath .= '/';
 		$rpath .= $this->name . '/' . $subdir;
 		$path = PUBLIC_ROOT . (defined('TEMPLATES_PATH') ? TEMPLATES_PATH : 'templates') . '/';
-		if(file_exists($path) && file_exists(MODULES_ROOT . $this->name . '/' . $subdir))
+		if(file_exists($path) && file_exists($this->path . $subdir))
 		{
 			if(file_exists($path . $target))
 			{
-				echo "  > Leaving existing file at " . $path . $target . " in place\n";
+				$this->ui->progress("Leaving existing file at " . $path . $target . " in place");
 			}
 			else
 			{
-				echo "  > Linking $rpath to $target in $path\n";
+				$this->ui->progress("Linking $rpath to $target in $path");
 				@unlink($path . $target);
 				symlink($rpath, $path . $target);
 			}
 		}
+	}
+}
+
+abstract class BuiltinModuleInstaller extends ModuleInstaller
+{
+	protected function linkTemplates($subdir = 'templates', $target = null, $rpath = null)
+	{
+		if(!strlen($rpath))
+		{
+			if(substr($this->installer->relPlatformPath, 0, 1) == '/')
+			{
+				$rpath = $this->installer->relPlatformPath;
+			}
+			else
+			{
+				$rpath = '../../' . $this->installer->relPlatformPath;
+			}
+		}
+		return parent::linkTemplates($subdir, $target, $rpath);
 	}
 }

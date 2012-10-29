@@ -16,6 +16,7 @@
  */
 
 require_once(dirname(__FILE__) . '/module.php');
+require_once(dirname(__FILE__) . '/ui.php');
 
 class Installer
 {
@@ -35,8 +36,14 @@ class Installer
 	public $relModulesPath;
 	public $relPublicPath;
 
+	public $ui;
+	
+	public $builtinModules = array('lib', 'framework', 'setup', 'gendoc', 'testsuite', 'login', 'silk', 'log');
+
 	public function __construct()
 	{
+		$this->ui = InstallerUI::getInstance();
+		$this->ui->title = $this->installerName;
 		if(!strlen($this->defaultInstanceName))
 		{
 			$hostname = explode('.', php_uname('n'));		
@@ -97,9 +104,7 @@ class Installer
 	protected function init()
 	{
 		umask(022);
-		echo $this->installerName . "\n";
-		echo str_repeat('=', strlen($this->installerName)) . "\n\n";
-		
+		$this->ui->begin();
 		echo "This script will generate an initial set of configuration files for your\n";
 		echo "application based upon the answers you give below.\n\n";
 
@@ -110,7 +115,7 @@ class Installer
 		echo " - Application modules: " . MODULES_ROOT . "\n";
 		echo " - Configuration files: " . CONFIG_ROOT . "\n";
 		echo " - Eregansu platform:   " . PLATFORM_ROOT . "\n";
-
+		$this->ui->end();
 		if(!strncmp(INSTANCE_ROOT, PLATFORM_ROOT, strlen(INSTANCE_ROOT)))
 		{
 			$this->relPlatformPath = substr(PLATFORM_ROOT, strlen(INSTANCE_ROOT));
@@ -134,19 +139,18 @@ class Installer
 		else
 		{
 			$this->relPublicPath = PUBLIC_ROOT;
-		}
-		echo "\n";
+		}		
 	}
 	
 	protected function checkConfigRoot()
 	{
 		if(file_exists(CONFIG_ROOT))
 		{
-			echo "--> " . CONFIG_ROOT . " already exists.\n\n";
+			$this->ui->notice(CONFIG_ROOT . " already exists.");
 		}
 		else
 		{
-			echo "--> " . CONFIG_ROOT . " does not exist, creating.\n\n";
+			$this->ui->notice(CONFIG_ROOT . " does not exist, creating.");
 			if(!mkdir(CONFIG_ROOT)) exit(1);
 			chmod(CONFIG_ROOT, 0755);
 		}
@@ -160,11 +164,11 @@ class Installer
 		}
 		if(file_exists(PUBLIC_ROOT))
 		{
-			echo "--> " . PUBLIC_ROOT . " already exists.\n\n";
+			$this->ui->notice(PUBLIC_ROOT . " already exists.");
 		}
 		else
 		{
-			echo "--> " . PUBLIC_ROOT . " does not exist, creating.\n\n";
+			$this->ui->notice(PUBLIC_ROOT . " does not exist, creating.");
 			if(!mkdir(PUBLIC_ROOT)) exit(1);
 			chmod(PUBLIC_ROOT, 0755);
 		}
@@ -172,22 +176,24 @@ class Installer
 	
 	protected function checkAppName()
 	{
-		echo "\nYou need to specify a short name for your application. This name will be used\n";
+		$this->ui->begin();
+		echo "You need to specify a short name for your application. This name will be used\n";
 		echo "in the filename of your application configuration file. For example, if you\n";
 		echo "set the short name to be 'myapp', the application configuration file will be\n";
 		echo "created as appconfig.myapp.php. A symbolic link will be created from this file\n";
-		echo "to appconfig.php.\n\n";
-		
+		echo "to appconfig.php.\n";
 		do
 		{
 			echo "Please enter a name consisting only of letters, numbers and dashes, 1-16 characters\n";
-			$this->appname = $this->prompt('Application name', $this->defaultAppName);
-			if(strlen($this->appname) < 1 || strlen($this->appname) > 16) continue;
-			if(!preg_match('/^[A-Za-z0-9-]+$/', $this->appname)) continue;
-			break;
+			$this->appname = $this->ui->prompt('Application name', $this->defaultAppName);
+			if((strlen($this->appname) > 1 && strlen($this->appname) <= 16) &&
+			   preg_match('/^[A-Za-z0-9-]+$/', $this->appname))
+			{
+				break;
+			}
+			$this->ui->begin();
 		}
 		while(true);
-		echo "\n";
 	}
 	
 	protected function checkAppConfig()
@@ -195,30 +201,32 @@ class Installer
 		$this->appconfig = CONFIG_ROOT . 'appconfig.' . $this->appname . '.php';				
 		if(file_exists($this->appconfig))
 		{
+			$this->ui->begin();
 			echo "The file appconfig." . $this->appname . ".php already exists. Would you like to delete it\n";
 			echo "and create a new one?\n\n";
 			do
 			{
-				$ans = $this->prompt("Delete appconfig." . $this->appname . ".php", 'N', 'Y/N');
+				$ans = $this->ui->prompt("Delete appconfig." . $this->appname . ".php", 'N', 'Y/N');
 				$ans = substr(strtoupper($ans), 0, 1);
 				if($ans == 'Y' || $ans == 'N') break;
+				$this->ui->begin();
 			}
 			while(true);
 			echo "\n";
 			if($ans == 'Y')
 			{
-				echo "--> Deleting existing " . $this->appconfig . "\n";
+				$this->ui->notice("Deleting existing " . $this->appconfig);
 				if(!unlink($this->appconfig)) exit(1);
 			}
 		}
 		if(file_exists($this->appconfig))
 		{
-			echo "--> Skipping application configuration as appconfig." . $this->appname . ".php already exists\n";
+			$this->ui->notice("Skipping application configuration as appconfig." . $this->appname . ".php already exists");
 		}
 		else
 		{
 			$this->appconfigCreated = true;
-			echo "--> Creating " . $this->appconfig . "\n";
+			$this->ui->notice("Creating " . $this->appconfig);
 			if(!($f = fopen($this->appconfig, 'w'))) exit(1);
 			fwrite($f, '<?php' . "\n\n");
 			fwrite($f, '/* Application configuration for ' . $this->appname . ' - generated by Eregansu Install at ' . strftime('%Y-%m-%d %H:%M:%S') . '*/' . "\n\n");
@@ -234,25 +242,27 @@ class Installer
 		{
 			if(is_link(CONFIG_ROOT . 'appconfig.php'))
 			{
-				echo "--> appconfig.php already exists and is a symbolic link, re-creating\n";
+				$this->ui->notice("appconfig.php already exists and is a symbolic link, re-creating");
 				if(!unlink(CONFIG_ROOT . 'appconfig.php')) exit(1);
 			}
 			else
 			{
+				$this->ui->begin();
 				echo "The file appconfig.php already exists but is not a symbolic link. Do you\n";
 				echo "wish to keep this file as-is, or move it out of the way and create the symbolic\n";
 				echo "link to appconfig." . $this->appname . ".php?\n\n";
 				do
 				{
-					$ans = $this->prompt("Keep appconfig.php as-is", 'N', 'Y/N');
+					$ans = $this->ui->prompt("Keep appconfig.php as-is", 'N', 'Y/N');
 					$ans = substr(strtoupper($ans), 0, 1);
 					if($ans == 'Y' || $ans == 'N') break;
+					$this->ui->begin();
 				}
 				while(true);
 				if($ans == 'N')
 				{
 					$newname = "appconfig.old-" . getmypid() . ".php";
-					echo "---> Renaming appconfig.php to $newname\n";
+					$this->ui->notice("Renaming appconfig.php to $newname");
 					if(!rename(CONFIG_ROOT . 'appconfig.php', CONFIG_ROOT . $newname)) exit(1);
 				}
 			}
@@ -260,14 +270,14 @@ class Installer
 		if(!file_exists(CONFIG_ROOT . 'appconfig.php'))
 		{
 			chdir(CONFIG_ROOT);
-			echo "--> Symbolically linking appconfig." . $this->appname . ".php to appconfig.php\n";
+			$this->ui->notice("Symbolically linking appconfig." . $this->appname . ".php to appconfig.php");
 			symlink('appconfig.' . $this->appname . '.php', 'appconfig.php');
 		}
-		echo "\n";	
 	}
 	
 	public function checkInstanceName()
 	{
+		$this->ui->begin();
 		echo "Every copy of each Eregansu application requires an instance name which should be\n";
 		echo "unique to that copy of the application. Usually, you would set the instance name\n";
 		echo "to the local part of the host's hostname, but if you are going to run multiple\n";
@@ -281,17 +291,18 @@ class Installer
 		echo "If you’re just experimenting with Eregansu and want to get set up quickly, the\n";
 		echo "default value should be fine.\n\n";
 		do
-		{
+		{			
 			echo "Please enter a name consisting only of letters, numbers and dashes, 1-32 characters\n";
-			$ans = $this->prompt("Instance", $this->defaultInstanceName);
+			$ans = $this->ui->prompt("Instance name", $this->defaultInstanceName);
 			$ans = trim(strtolower($ans));
 			if(strlen($ans) >= 1 && strlen($ans) <= 32)
 			{
 				break;
 			}
+			$this->ui->begin();
 		}
 		while(true);
-		$this->instname = $ans;		
+		$this->instname = $ans;
 	}
 	
 	public function checkConfig()
@@ -299,30 +310,31 @@ class Installer
 		$this->config = CONFIG_ROOT . 'config.' . $this->instname . '.php';				
 		if(file_exists($this->config))
 		{
+			$this->ui->begin();
 			echo "The file config." . $this->instname . ".php already exists. Would you like to delete it\n";
 			echo "and create a new one?\n\n";
 			do
 			{
-				$ans = $this->prompt("Delete config." . $this->instname . ".php", 'N', 'Y/N');
+				$ans = $this->ui->prompt("Delete config." . $this->instname . ".php", 'N', 'Y/N');
 				$ans = substr(strtoupper($ans), 0, 1);
 				if($ans == 'Y' || $ans == 'N') break;
+				$this->ui->begin();
 			}
 			while(true);
-			echo "\n";
 			if($ans == 'Y')
 			{
-				echo "--> Deleting existing " . $this->config . "\n";
+				$this->ui->notice("Deleting existing " . $this->config);
 				if(!unlink($this->config)) exit(1);
 			}
 		}
 		if(file_exists($this->config))
 		{
-			echo "--> Skipping instance configuration as config." . $this->instname . ".php already exists\n";
+			$this->ui->notice("Skipping instance configuration as config." . $this->instname . ".php already exists");
 		}
 		else
 		{
 			$this->configCreated = true;
-			echo "--> Creating " . $this->config . "\n";
+			$this->ui->notice("Creating " . $this->config);
 			if(!($f = fopen($this->config, 'w'))) exit(1);
 			fwrite($f, '<?php' . "\n\n");
 			fwrite($f, '/* Instance configuration for ' . $this->instname . ' - generated by Eregansu Install at ' . strftime('%Y-%m-%d %H:%M:%S') . '*/' . "\n\n");
@@ -368,25 +380,27 @@ class Installer
 		{
 			if(is_link(CONFIG_ROOT . 'config.php'))
 			{
-				echo "--> config.php already exists and is a symbolic link, re-creating\n";
+				$this->ui->notice("config.php already exists and is a symbolic link, re-creating");
 				if(!unlink(CONFIG_ROOT . 'config.php')) exit(1);
 			}
 			else
 			{
+				$this->ui->begin();
 				echo "The file config.php already exists but is not a symbolic link. Do you\n";
 				echo "wish to keep this file as-is, or move it out of the way and create the symbolic\n";
 				echo "link to config." . $this->instname . ".php?\n\n";
 				do
 				{
-					$ans = $this->prompt("Keep config.php as-is", 'N', 'Y/N');
+					$ans = $this->ui->prompt("Keep config.php as-is", 'N', 'Y/N');
 					$ans = substr(strtoupper($ans), 0, 1);
 					if($ans == 'Y' || $ans == 'N') break;
+					$this->ui->begin();
 				}
 				while(true);
 				if($ans == 'N')
 				{
 					$newname = "config.old-" . getmypid() . ".php";
-					echo "---> Renaming config.php to $newname\n";
+					$this->ui->notice("Renaming config.php to $newname");
 					if(!rename(CONFIG_ROOT . 'config.php', CONFIG_ROOT . $newname)) exit(1);
 				}
 			}
@@ -394,50 +408,20 @@ class Installer
 		if(!file_exists(CONFIG_ROOT . 'config.php'))
 		{
 			chdir(CONFIG_ROOT);
-			echo "--> Symbolically linking config." . $this->instname . ".php to instconfig.php\n";
+			$this->ui->notice("Symbolically linking config." . $this->instname . ".php to instconfig.php");
 			symlink('config.' . $this->instname . '.php', 'config.php');
 		}
-		echo "\n";	
-	}
-	
-	protected function prompt($prompt, $default = null, $options = null)
-	{
-		static $stdin;
-		
-		if(!$stdin)
-		{
-			$stdin = fopen('php://stdin', 'r');
-		}
-		if($options)
-		{
-			$prompt .= ' (' . $options . ')';
-		}
-		$prompt .= '?';
-		if($default)
-		{
-			$prompt .= ' [' . $default . '] ';
-		}
-		echo $prompt;
-		flush();
-		$line = trim(fgets($stdin));
-		if(!strlen($line) && $default)
-		{
-			$line = $default;
-		}
-		echo "\n";
-		flush();
-		return $line;
 	}
 	
 	protected function checkIndex()
 	{
 		if(file_exists(PUBLIC_ROOT . 'index.php'))
 		{
-			echo "--> index.php already exists, leaving untouched\n";
+			$this->ui->notice("index.php already exists, leaving untouched");
 		}
 		else
 		{
-			echo "--> Creating index.php\n";
+			$this->ui->notice("Creating index.php");
 			$f = fopen(PUBLIC_ROOT . 'index.php', 'w');
 			fwrite($f, '<?php' . "\n\n");
 			fwrite($f, '/* Generated by Eregansu Install at ' . strftime('%Y-%m-%d %H:%M:%S') . ' */' . "\n\n");
@@ -456,12 +440,12 @@ class Installer
 	{
 		if(file_exists(INSTANCE_ROOT . 'cli'))
 		{
-			echo "--> Re-creating command-line script symbolic link\n";
+			$this->ui->notice("Re-creating command-line script symbolic link");
 			unlink(INSTANCE_ROOT . 'cli');
 		}
 		else
 		{
-			echo "--> Creating command-line script symbolic link\n";
+			$this->ui->notice("Creating command-line script symbolic link");
 		}
 		chdir(INSTANCE_ROOT);
 		symlink($this->relPlatformPath . 'cli', 'cli');
@@ -473,15 +457,15 @@ class Installer
 		{
 			if(!is_link(INSTANCE_ROOT . 'eregansu') && is_dir(INSTANCE_ROOT . 'eregansu'))
 			{
-				echo "--> " . INSTANCE_ROOT . "eregansu/ is a directory, leaving untouched\n";
+				$this->ui->notice(INSTANCE_ROOT . "eregansu/ is a directory, leaving untouched");
 				return;
 			}
-			echo "--> Re-creating eregansu script symbolic link\n";			
+			$this->ui->notice("Re-creating Eregansu platform symbolic link");
 			unlink(INSTANCE_ROOT . 'eregansu');
 		}
 		else
 		{
-			echo "--> Creating Eregansu platform symbolic link\n";
+			$this->ui->notice("Creating Eregansu platform symbolic link");
 		}
 		chdir(INSTANCE_ROOT);
 		symlink($this->relPlatformPath, 'eregansu');
@@ -491,12 +475,19 @@ class Installer
 	{
 		if(file_exists(PUBLIC_ROOT . '.htaccess'))
 		{
-			echo "--> .htaccess already exists, leaving untouched\n";
+			$this->ui->notice(".htaccess already exists, leaving untouched");
 		}
 		else
 		{
-			echo "--> Generating .htaccess from platform/htaccess.dist\n";
-			copy(PLATFORM_ROOT . 'htaccess.dist', PUBLIC_ROOT . '.htaccess');
+			$this->ui->notice("Generating .htaccess");
+			$f = fopen(PUBLIC_ROOT . '.htaccess', 'w');
+			fwrite($f, "RewriteEngine On\n");
+			fwrite($f, "RewriteBase /\n");
+			fwrite($f, "RewriteCond %{REQUEST_FILENAME} -f\n");
+			fwrite($f, "RewriteRule . - [L]\n");
+			fwrite($f, "RewriteRule  ^([_0-9a-zA-Z-]+/)?(.*\.php)$ $2 [L]\n");
+			fwrite($f, "RewriteRule . index.php [L]\n");
+			fclose($f);
 			chmod(PUBLIC_ROOT . '.htaccess', 0644);
 		}
 	}
@@ -505,10 +496,10 @@ class Installer
 	{
 		if(file_exists(CONFIG_ROOT . 'apache2.conf'))
 		{
-			echo "--> " . CONFIG_ROOT . "apache2.conf already exists, leaving untouched\n";
+			$this->ui->notice(CONFIG_ROOT . "apache2.conf already exists, leaving untouched");
 			return;
 		}
-		echo "--> Generating sample Apache 2.x virtual host configuration\n";
+		$this->ui->notice("Generating sample Apache 2.x virtual host configuration");
 		$f = fopen(CONFIG_ROOT . 'apache2.conf', 'w');
 		fwrite($f, "<VirtualHost *:80>\n" .
 			   "ServerName " . $this->appname . "\n" .
@@ -530,10 +521,10 @@ class Installer
 	{
 		if(file_exists(CONFIG_ROOT . 'lighttpd.conf'))
 		{
-			echo "--> " . CONFIG_ROOT . "lighttpd.conf already exists, leaving untouched\n";
+			$this->ui->notice(CONFIG_ROOT . "lighttpd.conf already exists, leaving untouched");
 			return;
 		}
-		echo "--> Generating sample Lighttpd virtual host configuration\n";
+		$this->ui->notice("Generating sample Lighttpd virtual host configuration");
 		$f = fopen(CONFIG_ROOT . 'lighttpd.conf', 'w');
 		fwrite($f, "\$HTTP[\"host\"] =~ \"^" . str_replace('.', '\.', $this->appname) . "$\" {\n" .
 			   "\tserver.document-root = \"" . PUBLIC_ROOT . "\"\n" .
@@ -548,19 +539,19 @@ class Installer
 	{
 		if(!file_exists(MODULES_ROOT))
 		{
-			echo "--> " . MODULES_ROOT . " does not exist, creating\n";
+			$this->ui->notice(MODULES_ROOT . " does not exist, creating");
 			mkdir(MODULES_ROOT);
 			chmod(MODULES_ROOT, 0755);
 			if(!file_exists(MODULES_ROOT . $this->appname))
 			{
-				echo "--> " . MODULES_ROOT . $this->appname . " does not exist, creating\n";
+				$this->ui->notice(MODULES_ROOT . $this->appname . " does not exist, creating");
 				mkdir(MODULES_ROOT . $this->appname);
 				chmod(MODULES_ROOT . $this->appname, 0755);				
 			}
 		}
 		else
 		{
-			echo "--> " . MODULES_ROOT . " already exists, leaving untouched\n";
+			$this->ui->notice(MODULES_ROOT . " already exists, leaving untouched");
 		}
 	}
 	
@@ -569,44 +560,45 @@ class Installer
 		$path = PUBLIC_ROOT . (defined('TEMPLATES_PATH') ? TEMPLATES_PATH : 'templates') . '/';
 		if(!file_exists($path))
 		{
-			echo "--> " . $path . " does not exist, creating\n";
+			$this->ui->notice($path . " does not exist, creating");
 			mkdir($path, true);
 			chmod($path, 0755);
-			$rpath = $this->relPlatformPath . 'login/templates';
-			if(substr($rpath, 0, 1) != '/')
-			{
-				$rpath = '../../' . $rpath;
-			}
-			if(!file_exists($path . 'login'))
-			{
-				echo "--> " . $path . "login does not exist, creating\n";			
-				symlink($rpath, $path . 'login');
-			}
-			if(!file_exists($path . 'default') && file_exists(PLATFORM_ROOT . 'examples/templates/'))
-			{
-				echo "--> " . $path . "default does not exist, creating\n";
-				mkdir($path . 'default');
-				$files = array('home.phtml', 'test.phtml', 'header.php', 'footer.php', 'screen.css');
-				foreach($files as $f)
-				{
-					echo "--> Creating " . $path . "default/" . $f . " from platform/examples/templates/" . $f . "\n";
-					copy(PLATFORM_ROOT . "examples/templates/" . $f, $path . "default/" . $f);
-				}
-			}
 		}
 		else
 		{
-			echo "--> " . $path . " already exists, leaving untouched\n";
+			$this->ui->notice($path . " already exists, leaving untouched");
 		}
 	}
 	
 	protected function scanModules()
 	{
-		echo "--> Scanning for modules...\n";
-		
-		$d = opendir(MODULES_ROOT);
+		$this->ui->notice("Scanning for modules...");
 		$modules = array();
 		$c = 0;
+		foreach($this->builtinModules as $de)
+		{
+			if(file_exists(PLATFORM_ROOT . $de . '/install.php'))
+			{
+					$result = include_once(PLATFORM_ROOT . $de . '/install.php');
+					
+					$className = 'Builtin' . $de . 'ModuleInstall';
+					if(is_string($result))
+					{
+						$className = $result;
+					}					
+					if(!class_exists($className))
+					{
+						$this->ui->warning(PLATFORM_ROOT . $de . '/install.php exists but does not define a class named ' . $className . '; skipping');
+						continue;
+					}
+					$inst = new $className($this, $de, PLATFORM_ROOT . $de . '/');
+					$k = sprintf('%04d-%04d', $inst->moduleOrder, $c);
+					$this->ui->progress("Found built-in module " . $inst->name);
+					$modules[$k] = $inst;
+			}
+			$c++;
+		}		
+		$d = opendir(MODULES_ROOT);
 		while(($de = readdir($d)))
 		{
 			if(substr($de, 0, 1) == '.') continue;
@@ -689,13 +681,19 @@ class Installer
 		}
 		echo "*** Configuration complete ***\n\n";
 		echo "Apache 2.x users: See " . CONFIG_ROOT . "apache2.conf for a sample virtual host configuration.\n";
+		echo "\n";
+		echo ">>> Installation complete\n";
 	}
 }
 
+/* An application can have a custom installer by placing an install.php in
+ * the root and having it put an instance of a class which supports the
+ * run() method in a variable named $installer.
+ */
 if(file_exists(INSTANCE_ROOT . '/install.php'))
 {
 	require_once(INSTANCE_ROOT . '/install.php');
-	if(!$installer)
+	if(!is_object($installer))
 	{
 		trigger_error(INSTANCE_ROOT . '/install.php does not initialise $installer to be an installer class instance', E_USER_ERROR);
 		exit(1);
@@ -710,5 +708,3 @@ if(!$installer->run())
 {
 	exit(1);
 }
-
-echo ">>> Installation complete\n";
