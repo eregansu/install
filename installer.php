@@ -643,12 +643,51 @@ class Installer
 		{
 			$config = null;
 		}
+		$soleWebModule = null;
+		foreach($modules as $inst)
+		{
+			if($soleWebModule === null)
+			{
+				if($inst->canBeSoleWebModule())
+				{
+					/* This module will be the sole web module until we know otherwise */
+					$soleWebModule = $inst;
+				}
+				else if($inst->canCoexistWithSoleWebModule())
+				{
+					/* This module won't be the sole web module, but can coexist with
+					 * another that is, so we don't need to do anything special.
+					 */
+					continue;
+				}
+				else
+				{
+					/* This module can't be the sole web module, but can't coexist with
+					 * another which is, so we stop looping immediately.
+					 */
+					break;
+				}
+			}
+			else if($inst->canCoexistWithSoleWebModule())
+			{
+				/* There's an existing web module selected, but this
+				 * one can coexist with it, proceed peacefully.
+				 */
+				continue;
+			}
+			else
+			{
+				/* Multiple non-coexisting web modules */
+				$soleWebModule = null;
+				break;
+			}
+		}
 		foreach($modules as $inst)
 		{
 			if($this->appconfigCreated)
 			{
 				fwrite($appConfig, "/* Application configuration for the '" . $inst->name. "' module */\n");
-				$inst->writeAppConfig($appConfig);
+				$inst->writeAppConfig($appConfig, ($soleWebModule === $inst), ($soleWebModule === null ? null : $soleWebModule->name));
 				fwrite($appConfig, "\n");
 			}
 			if($this->configCreated)
