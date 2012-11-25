@@ -428,7 +428,7 @@ class Installer
 			fwrite($f, "define('INSTANCE_ROOT', realpath(dirname(__FILE__) . '/..') . '/');\n");
 			fwrite($f, "define('PUBLIC_ROOT', realpath(dirname(__FILE__)) . '/');\n\n");
 
-			fwrite($f, 'require(INSTANCE_ROOT . \'/eregansu/platform.php\');' . "\n\n");
+			fwrite($f, 'require(INSTANCE_ROOT . \'eregansu/framework/platform.php\');' . "\n\n");
 
 			fwrite($f, '$app->process($request);' . "\n");
 			fclose($f);
