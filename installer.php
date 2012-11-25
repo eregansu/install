@@ -38,7 +38,7 @@ class Installer
 
 	public $ui;
 	
-	public $builtinModules = array('lib', 'framework', 'setup', 'gendoc', 'testsuite', 'login', 'silk', 'log');
+	public $builtinModules = array('lib', 'framework', 'setup', 'gendoc', 'testsuite', 'login', 'silk', 'log', 'views');
 
 	public function __construct()
 	{
