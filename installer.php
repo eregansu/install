@@ -615,12 +615,12 @@ class Installer
 					}					
 					if(!class_exists($className))
 					{
-						echo '*** ' . MODULES_ROOT . $de . '/install.php exists but does not define a class named ' . $className . '; skipping' . "\n";
+						$this->ui->error(MODULES_ROOT . $de . '/install.php exists but does not define a class named ' . $className . '; skipping');
 						continue;
 					}
 					$inst = new $className($this, $de, MODULES_ROOT . $de . '/');
 					$k = sprintf('%04d-%04d', $inst->moduleOrder, $c);
-					echo " +> Found module " . $inst->name . "\n";
+					$this->ui->progress("Found module " . $inst->name);
 					$modules[$k] = $inst;
 				}
 			}
@@ -645,13 +645,14 @@ class Installer
 		}
 		$soleWebModule = null;
 		foreach($modules as $inst)
-		{
+		{			
 			if($soleWebModule === null)
 			{
 				if($inst->canBeSoleWebModule())
 				{
 					/* This module will be the sole web module until we know otherwise */
 					$soleWebModule = $inst;
+					$this->ui->progress($inst->name . ' can be sole web module');
 				}
 				else if($inst->canCoexistWithSoleWebModule())
 				{
@@ -665,6 +666,7 @@ class Installer
 					/* This module can't be the sole web module, but can't coexist with
 					 * another which is, so we stop looping immediately.
 					 */
+					$this->ui->progress($inst->name . ' cannot be sole web module nor coexist');
 					break;
 				}
 			}
@@ -678,9 +680,14 @@ class Installer
 			else
 			{
 				/* Multiple non-coexisting web modules */
+				$this->ui->progress($soleWebModule->name . ' will not be sole web module because ' . $inst->name . ' cannot coexist with it');
 				$soleWebModule = null;
 				break;
 			}
+		}
+		if($soleWebModule)
+		{
+			$this->ui->notice('Configured with ' . $soleWebModule->name . ' as sole web module');
 		}
 		foreach($modules as $inst)
 		{

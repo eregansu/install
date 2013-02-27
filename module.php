@@ -22,6 +22,8 @@ abstract class ModuleInstaller
 	public $path;
 	public $moduleOrder = 1000;
 	public $ui;
+	public $canBeSole = false;
+	public $coexists = false; 
 	
 	public function __construct($installer, $name, $path)
 	{
@@ -105,12 +107,12 @@ abstract class ModuleInstaller
 	
 	public function canBeSoleWebModule()
 	{
-		return false;
+		return $this->canBeSole;
 	}
 	
 	public function canCoexistWithSoleWebModule()
 	{
-		return false;
+		return $this->coexists;
 	}
 	
 	public function createLinks()
