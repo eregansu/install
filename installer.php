@@ -494,45 +494,69 @@ class Installer
 
 	protected function checkApache2Config()
 	{
-		if(file_exists(CONFIG_ROOT . 'apache2.conf'))
+		if(file_exists(CONFIG_ROOT . 'apache2.' . $this->instname . '.conf'))
 		{
 			$this->ui->notice(CONFIG_ROOT . "apache2.conf already exists, leaving untouched");
-			return;
 		}
-		$this->ui->notice("Generating sample Apache 2.x virtual host configuration");
-		$f = fopen(CONFIG_ROOT . 'apache2.conf', 'w');
-		fwrite($f, "<VirtualHost *:80>\n" .
-			   "ServerName " . $this->appname . "\n" .
-			   "DocumentRoot " . PUBLIC_ROOT . "\n" .
-			   "DirectoryIndex index.php\n" .
-			   "</VirtualHost>\n\n" .
+		else
+		{
+			$this->ui->notice("Generating sample Apache 2.x virtual host configuration apache2." . $this->instname . ".conf");
+			$f = fopen(CONFIG_ROOT . 'apache2.' . $this->instname . '.conf', 'w');
+			fwrite($f, "<VirtualHost *:80>\n" .
+				   "\tServerName " . $this->appname . "\n" .
+				   "\tDocumentRoot " . PUBLIC_ROOT . "\n" .
+				   "\tDirectoryIndex index.php\n" .
+				   "</VirtualHost>\n\n" .
 
-			   "<Directory " . PUBLIC_ROOT . ">\n" .
-			   "Order allow,deny\n" .
-			   "Allow from all\n" .
-			   "Options +FollowSymLinks\n" .
-			   "AllowOverride all\n" .
-			   "</Directory>\n\n"
-			);
-		fclose($f);
+				   "<Directory " . PUBLIC_ROOT . ">\n" .
+				   "\tOrder allow,deny\n" .
+				   "\tAllow from all\n" .
+				   "\tOptions +FollowSymLinks\n" .
+				   "\tAllowOverride all\n" .
+				   "</Directory>\n\n"
+				);
+			fclose($f);
+		}
+		if(file_exists(CONFIG_ROOT . 'apache2.conf') && !is_link(CONFIG_ROOT . 'apache2.conf'))
+		{
+			$this->ui->notice(CONFIG_ROOT . "apache2.conf already exists, leaving untouched");
+		}
+		else
+		{
+			@unlink(CONFIG_ROOT . 'apache2.conf');
+			chdir(CONFIG_ROOT);
+			symlink('apache2.' . $this->instname . '.conf', 'apache2.conf');
+		}
 	}
 
 	protected function checkLighttpdConfig()
 	{
-		if(file_exists(CONFIG_ROOT . 'lighttpd.conf'))
+		if(file_exists(CONFIG_ROOT . 'lighttpd.' . $this->instname . '.conf'))
 		{
 			$this->ui->notice(CONFIG_ROOT . "lighttpd.conf already exists, leaving untouched");
-			return;
 		}
-		$this->ui->notice("Generating sample Lighttpd virtual host configuration");
-		$f = fopen(CONFIG_ROOT . 'lighttpd.conf', 'w');
-		fwrite($f, "\$HTTP[\"host\"] =~ \"^" . str_replace('.', '\.', $this->appname) . "$\" {\n" .
-			   "\tserver.document-root = \"" . PUBLIC_ROOT . "\"\n" .
-			   "\turl.rewrite-once = (\n" .
-			   "\t\t\"^(?!/((templates|media|data|content)/.*|favicon.ico|slate.manifest))\" => \"/index.php\"\n" .
-			   "\t)\n" .
-			   "}\n");
-		fclose($f);
+		else
+		{
+			$this->ui->notice("Generating sample Lighttpd virtual host configuration lighttpd." . $this->instname . ".conf");
+			$f = fopen(CONFIG_ROOT . 'lighttpd.' . $this->instname . '.conf', 'w');
+			fwrite($f, "\$HTTP[\"host\"] =~ \"^" . str_replace('.', '\.', $this->appname) . "$\" {\n" .
+				   "\tserver.document-root = \"" . PUBLIC_ROOT . "\"\n" .
+				   "\turl.rewrite-once = (\n" .
+				   "\t\t\"^(?!/((templates|media|data|content)/.*|favicon.ico|slate.manifest))\" => \"/index.php\"\n" .
+				   "\t)\n" .
+				   "}\n");
+			fclose($f);
+		}
+		if(file_exists(CONFIG_ROOT . 'lighttpd.conf') && !is_link(CONFIG_ROOT . 'lighttpd.conf'))
+		{
+			$this->ui->notice(CONFIG_ROOT . "lighttpd.conf already exists, leaving untouched");
+		}
+		else
+		{
+			@unlink(CONFIG_ROOT . 'lighttpd.conf');
+			chdir(CONFIG_ROOT);
+			symlink('lighttpd.' . $this->instname . '.conf', 'lighttpd.conf');
+		}
 	}
 	
 	protected function checkApp()
@@ -726,7 +750,7 @@ class Installer
 			fclose($f);
 		}
 		echo "*** Configuration complete ***\n\n";
-		echo "Apache 2.x users: See " . CONFIG_ROOT . "apache2.conf for a sample virtual host configuration.\n";
+		echo "Apache 2.x users: See " . CONFIG_ROOT . "apache2." . $this->instname . ".conf for a sample virtual host configuration.\n";
 		echo "\n";
 		echo ">>> Installation complete\n";
 	}
